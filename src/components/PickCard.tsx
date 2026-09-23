@@ -1,6 +1,6 @@
 import type { Offering, PickSide } from '../types';
 import { useGameStore } from '../store/gameStore';
-import { etDayKey } from '../lib/timeFormat';
+import { etDayKey, formatDayLabelET } from '../lib/timeFormat';
 import SportIcon from './SportIcon';
 
 interface PickCardProps {
@@ -112,6 +112,7 @@ function PickButton({
   ringColor,
   desaturate,
   mark,
+  keepClickable,
   onClick,
 }: {
   label: string;
@@ -139,6 +140,15 @@ function PickButton({
   desaturate?: boolean;
   /** Outcome mark for this side, or undefined to leave it unmarked. */
   mark?: RowMark;
+  /**
+   * Stay a real click target despite `isDisabled` styling.
+   *
+   * A future-day card is disabled — there is nothing to select yet — but a
+   * native `disabled` button swallows the tap entirely, so there was no way
+   * to tell the player WHY. This keeps the tap live so onClick can surface
+   * that reason instead of doing nothing.
+   */
+  keepClickable?: boolean;
   onClick: () => void;
 }) {
   const muted = isDisabled && !isSelected;
@@ -147,7 +157,7 @@ function PickButton({
   return (
     <button
       onClick={onClick}
-      disabled={isDisabled}
+      disabled={isDisabled && !keepClickable}
       className={`relative flex items-center h-[56px] rounded-lg overflow-visible text-[14px] leading-[18px] font-bold font-title transition-all duration-200 disabled:cursor-not-allowed ${
         isSelected ? 'ring-2' : ''
       }`}
@@ -157,6 +167,7 @@ function PickButton({
         // unanswered question reads as settled history rather than as a live
         // choice you could still make.
         filter: desaturate ? 'grayscale(1)' : undefined,
+        cursor: isDisabled && keepClickable ? 'pointer' : undefined,
         ...(isSelected ? { '--tw-ring-color': ringColor ?? '#FFFFFF' } as React.CSSProperties : {}),
       }}
     >
@@ -227,7 +238,7 @@ function PickButton({
 }
 
 export default function PickCard({ offering, index }: PickCardProps) {
-  const { pendingSelection, submitted, submittedPick, selectPick, pickHistory } = useGameStore();
+  const { pendingSelection, submitted, submittedPick, selectPick, pickHistory, showFutureDayNotice } = useGameStore();
   const activeSelection = submitted ? submittedPick : pendingSelection;
   const isLocked = offering.startTimeISO ? new Date(offering.startTimeISO) <= new Date() : false;
   /*
@@ -304,6 +315,10 @@ export default function PickCard({ offering, index }: PickCardProps) {
   };
 
   const handlePick = (side: PickSide) => {
+    if (isFutureDay) {
+      showFutureDayNotice(`Come back ${formatDayLabelET(offering.startTimeISO!)} to make this pick.`);
+      return;
+    }
     if (isDisabled) return;
     selectPick(offering, side);
   };
@@ -327,14 +342,23 @@ export default function PickCard({ offering, index }: PickCardProps) {
       <div className="flex items-center gap-2 mb-3">
         <SportIcon league={offering.league} />
         <span className="text-[12px] leading-[14px] tracking-[0.02em] font-medium uppercase font-title" style={{ color: 'var(--color-theme-text-tertiary)' }}>{offering.league}</span>
-        {isLocked ? (
+        {isLocked || isFutureDay ? (
           /*
             Lock reads as disabled, not as a live accent.
             Was #006FFF — an action blue, which on a card you can no longer
             act on pulled the eye to the one thing that does nothing. Muted
             grey says "closed" without competing with the result badge.
+
+            Same icon for isLocked and isFutureDay, but NOT the same title.
+            "Locked" is true of a game that already started — saying that
+            about Friday's game from a Tuesday reads as if it already
+            happened. The future-day case gets the date it opens instead.
           */
-          <span className="ml-auto flex items-center" style={{ color: 'var(--color-theme-text-muted)' }} title="Locked">
+          <span
+            className="ml-auto flex items-center"
+            style={{ color: 'var(--color-theme-text-muted)' }}
+            title={isFutureDay ? `Opens ${formatDayLabelET(offering.startTimeISO!)}` : 'Locked'}
+          >
             <LockMark />
           </span>
         ) : (
@@ -397,6 +421,7 @@ export default function PickCard({ offering, index }: PickCardProps) {
           isHeadshot={isHeadshot}
           isSelected={isSelected && selectedSide === 'A'}
           isDisabled={isDisabled}
+          keepClickable={isFutureDay}
           ringColor={markColor}
           desaturate={unplayed}
           mark={markFor('A')}
@@ -413,6 +438,7 @@ export default function PickCard({ offering, index }: PickCardProps) {
           isHeadshot={isHeadshot}
           isSelected={isSelected && selectedSide === 'B'}
           isDisabled={isDisabled}
+          keepClickable={isFutureDay}
           ringColor={markColor}
           desaturate={unplayed}
           mark={markFor('B')}

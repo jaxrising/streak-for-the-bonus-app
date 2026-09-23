@@ -47,3 +47,17 @@ export function etDayKey(iso: string | Date): string {
   if (Number.isNaN(d.getTime())) return '';
   return ET_DAY.format(d);
 }
+
+const ET_DAY_LABEL = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+});
+
+/** "Thu, Sep 25" — for telling a player which day a future pick opens on. */
+export function formatDayLabelET(iso: string | Date): string {
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (Number.isNaN(d.getTime())) return '';
+  return ET_DAY_LABEL.format(d);
+}

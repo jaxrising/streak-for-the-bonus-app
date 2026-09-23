@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { HowToPlayButton } from './HowToPlay';
 import SubmitPickBar from './SubmitPickBar';
 import AchievementToast from './AchievementToast';
+import InfoToast from './InfoToast';
 import BonusBetAward from './BonusBetAward';
 import { useRewardCadence } from '../lib/rewardCadence';
 
@@ -174,6 +175,7 @@ export default function Layout() {
       </div>
 
       <AchievementToast />
+      <InfoToast />
       <BonusBetAward />
       <SubmitPickBar />
     </div>

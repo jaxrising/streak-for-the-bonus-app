@@ -42,6 +42,8 @@ interface GameState {
   dkLinked: boolean;
   uid: string | null;
   newlyEarnedAchievement: Achievement | null;
+  /** A plain-text toast, e.g. "Come back Thu, Sep 25 to make this pick." */
+  futureDayNotice: string | null;
   /**
    * The reward moment, queued for BonusBetAward to present.
    *
@@ -72,6 +74,8 @@ interface GameState {
   setUser: (uid: string | null) => void;
   syncFromFirebase: (data: { weeklyStreak: number; weeklyWins: number; allTimeWins: number }) => void;
   clearAchievementToast: () => void;
+  showFutureDayNotice: (message: string) => void;
+  clearFutureDayNotice: () => void;
   awardBonusBet: (tier: RewardTier) => void;
   clearAward: () => void;
 }
@@ -90,6 +94,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   espnLinked: false,
   dkLinked: false,
   newlyEarnedAchievement: null,
+  futureDayNotice: null,
   pendingAward: null,
   lastWinDate: null,
   consecutiveDaysWithWin: 0,
@@ -360,6 +365,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (linkAchievement) set({ newlyEarnedAchievement: linkAchievement });
   },
   clearAchievementToast: () => set({ newlyEarnedAchievement: null }),
+  showFutureDayNotice: (message) => set({ futureDayNotice: message }),
+  clearFutureDayNotice: () => set({ futureDayNotice: null }),
 
   /** Present a reward moment directly. Used by the cadence simulator. */
   awardBonusBet: (tier) => set({ pendingAward: tier }),
