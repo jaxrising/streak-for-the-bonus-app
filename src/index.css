@@ -1,0 +1,747 @@
+@import "tailwindcss";
+@import "../../../game-kit/tokens.css";
+@import "../../../game-kit/reveal.css";
+
+/* ============================================================================
+   Self-hosted display faces
+   ----------------------------------------------------------------------------
+   game-kit/tokens.css declares Ignite against gitlab.disney.com. Those URLs
+   are SSO-gated: they return a ~17KB HTML sign-in page with a 200 status, not
+   a font. @font-face then fails silently and everything renders in the
+   Impact / Arial fallback — the exact failure the kit's own comment warns of.
+
+   These rules come AFTER the tokens.css import deliberately. When two
+   @font-face rules declare the same family + weight + style, the later one
+   wins, so this block overrides the kit's remote declarations without forking
+   the kit (it is shared with Daily Visual ID).
+
+   PLAYOFF IN PLACE OF IGNITE
+   Ignite is only licensable here through Monotype, so Streak uses Playoff Pro
+   Cond for the display and title roles instead. This is a local substitution
+   for this prototype — the kit still treats Ignite as its default, and
+   nothing here changes that for any other game.
+
+   Both faces are listed in the stacks below, Playoff first. Whichever is
+   actually installed wins, so dropping Ignite in later needs no code change.
+
+   Drop the .woff2 files into public/fonts/ — see public/fonts/README.md.
+   Until they are present these 404 and the app falls back to system fonts:
+   no worse than today, and it starts working the moment the files land.
+   ========================================================================= */
+@font-face {
+  font-family: 'Playoff Pro Cond';
+  src: url('/fonts/PlayoffProCond-Bold.woff2') format('woff2');
+  font-weight: 700 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Playoff Pro Cond';
+  src: url('/fonts/PlayoffProCond-Regular.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
+/* Italic appears in three places — the How To Play heading, the reward
+   amount, and achievement titles. Without a real italic face the browser
+   synthesises a slant, which reads as a rendering fault next to a proper
+   condensed display face. */
+@font-face {
+  font-family: 'Playoff Pro Cond';
+  src: url('/fonts/PlayoffProCond-BoldItalic.woff2') format('woff2');
+  font-weight: 700 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Kept so an Ignite licence later is a file drop, not a code change. */
+@font-face {
+  font-family: 'ESPN Ignite Display';
+  src: url('/fonts/IgniteDisplay-CondensedHeavy.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'ESPN Ignite Text Narrow';
+  src: url('/fonts/IgniteTextNarrow-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'ESPN Ignite Text Narrow';
+  src: url('/fonts/IgniteTextNarrow-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Benton Sans';
+  src: url('/fonts/BentonSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Benton Sans';
+  src: url('/fonts/BentonSans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+/* 700 is only used twice (the PeriodNav week label and the outcome label),
+   but without a real Bold the browser fakes one by thickening the Medium —
+   and a synthesised bold beside real Playoff Bold is exactly the kind of
+   mismatch that reads as "something is off" without anyone naming it. */
+@font-face {
+  font-family: 'Benton Sans';
+  src: url('/fonts/BentonSans-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ----------------------------------------------------------------------------
+   Type stacks — Playoff first, Ignite behind it, system last.
+
+   Overrides the kit's @theme values for this app only. `font-title` carries
+   55 usages at 12-14px, which is a lot of small text for a condensed display
+   face; the system condensed fallback sits behind Playoff so it degrades to
+   something readable rather than to Impact.
+   -------------------------------------------------------------------------- */
+@theme {
+  --font-display: 'Playoff Pro Cond', 'ESPN Ignite Display', Impact, 'Arial Black', sans-serif;
+  --font-title: 'Playoff Pro Cond', 'ESPN Ignite Text Narrow', 'Arial Narrow', Arial, sans-serif;
+  --font-body: 'Benton Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ============================================================================
+   App-specific Tailwind theme tokens
+   ----------------------------------------------------------------------------
+   game-kit/tokens.css owns --font-display / --font-title / --font-body and the
+   whole gk-* colour ramp, so those are deliberately NOT redeclared here.
+
+   What remains below are names the kit does not define but Streak generates
+   utilities from. Ten class usages depend on this block — text-status-success,
+   bg-status-success, border-status-success, text-status-error, text-espn-red —
+   so deleting it breaks them silently at build time (Tailwind just drops the
+   unknown utility).
+
+   Values mirror the kit rather than referencing it. The kit does the same
+   thing internally between its :root and @theme blocks, and documents the
+   duplication as deliberate: Tailwind's @theme is not readable as plain custom
+   properties, so one of the two has to be literal.
+   ========================================================================= */
+@theme {
+  /* Neutral primitives — 13 references, mostly badge + avatar surfaces */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f9f9f9;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e0e0e0;
+  --color-neutral-300: #cccccc;
+  --color-neutral-400: #999999;
+  --color-neutral-500: #808080;
+  --color-neutral-600: #666666;
+  --color-neutral-700: #444444;
+  --color-neutral-800: #2a2a2a;
+  --color-neutral-850: #1e1e1e;
+  --color-neutral-900: #121212;
+  --color-neutral-1000: #000000;
+
+  /* Brand — mirrors --gk-espn-red / --gk-espn-gold */
+  --color-espn-red: #f51825;
+  --color-espn-gold: #ffc432;
+
+  /*
+   * Accent — DIVERGES from the kit.
+   *
+   * --gk-accent and --gk-streak are still #FFDA18 (yellow). Streak now uses
+   * #05A569. The divergence is deliberate and local: no component references
+   * gk-* names, so overriding here changes Streak without touching the kit,
+   * which is shared with Daily Visual ID.
+   *
+   * If green is meant to be the shared direction rather than Streak's alone,
+   * this belongs in the kit instead and these three become mirrors again.
+   */
+  --color-accent: #05A569;
+  --color-accent-light: #d9ff5c;
+
+  /* Status — mirrors --gk-win / --gk-loss / --gk-warn */
+  --color-status-success: #51FF77;
+  --color-earned: #51FF77;
+  --color-status-error: #ff3232;
+  --color-status-warning: #ff7700;
+  --color-status-neutral: #666666;
+
+  /* Streak identity — see the accent note above re: divergence from the kit */
+  --color-streak-glow: #05A569;
+  --color-streak: #05A569;
+  --color-wins: #FF9151;
+}
+
+/* ============================================================================
+   Game Kit bridge
+   ----------------------------------------------------------------------------
+   Streak carries 234 references to --color-theme-*, spread across ~25
+   components as inline var() styles. The kit names the same concepts
+   --gk-canvas / --gk-surface / --gk-ink and uses different values.
+
+   Renaming 234 call sites and changing the palette in one commit would make
+   the visual change unreviewable — every regression would look like a rename
+   and every rename would look like a regression. So the names stay and the
+   values move underneath them. Components migrate to gk-* opportunistically
+   after this lands, and each one is then a no-op diff.
+
+   Ramp note: the kit exposes three ink levels, Streak uses five. The two
+   in-between steps are derived with color-mix so they stay on the kit's ramp
+   and stay monotonic, rather than being hand-picked back to the old values.
+   ========================================================================= */
+[data-theme="dark"],
+:root {
+  --color-theme-bg: var(--gk-canvas);
+  --color-theme-bg-alt: var(--gk-n-1000);
+  --color-theme-surface: var(--gk-surface);
+  --color-theme-surface-alt: var(--gk-surface-alt);
+  --color-theme-surface-raised: #ffffff14;
+
+  --color-theme-border: var(--gk-border);
+  --color-theme-border-weak: var(--gk-surface-alt);
+  --color-theme-border-hover: var(--gk-border-strong);
+
+  --color-theme-text: var(--gk-ink);
+  --color-theme-text-secondary: var(--gk-ink-2);
+  --color-theme-text-tertiary: color-mix(in srgb, var(--gk-ink-2) 55%, var(--gk-ink-3));
+  --color-theme-text-muted: var(--gk-ink-3);
+  --color-theme-text-disabled: color-mix(in srgb, var(--gk-ink-3) 55%, var(--gk-canvas));
+
+  --color-theme-nav-bg: var(--gk-n-1000);
+  --color-theme-nav-inactive: var(--gk-n-500);
+  --color-theme-input-bg: var(--gk-surface);
+  --color-theme-input-border: #0000003d;
+
+  --color-theme-scrollbar: var(--gk-border-strong);
+}
+
+[data-theme="light"] {
+  --color-theme-bg: var(--gk-canvas);
+  --color-theme-bg-alt: var(--gk-n-200);
+  --color-theme-surface: var(--gk-surface);
+  --color-theme-surface-alt: var(--gk-surface-alt);
+  --color-theme-surface-raised: #00000014;
+
+  --color-theme-border: var(--gk-border);
+  --color-theme-border-weak: var(--gk-n-100);
+  --color-theme-border-hover: var(--gk-border-strong);
+
+  --color-theme-text: var(--gk-ink);
+  --color-theme-text-secondary: var(--gk-ink-2);
+  --color-theme-text-tertiary: color-mix(in srgb, var(--gk-ink-2) 55%, var(--gk-ink-3));
+  --color-theme-text-muted: var(--gk-ink-3);
+  --color-theme-text-disabled: color-mix(in srgb, var(--gk-ink-3) 45%, var(--gk-canvas));
+
+  /* Nav stays black in both themes — matches the ESPN global bar */
+  --color-theme-nav-bg: var(--gk-n-1000);
+  --color-theme-nav-inactive: var(--gk-n-500);
+  --color-theme-input-bg: #ffffff00;
+  --color-theme-input-border: #0000003d;
+
+  --color-theme-scrollbar: var(--gk-n-300);
+
+  /* Contrast-safe variants on a light ground — kit provides --gk-win/--gk-streak */
+  --color-earned: var(--gk-win);
+  --color-status-success: var(--gk-win);
+  /* Accent green darkened for a white ground. #05A569 scores only 3.19:1 on
+     #FFFFFF — below AA for body text — so light theme drops to the same hue
+     at lower lightness (5.60:1). Not taken from --gk-streak: the kit's light
+     streak value is still the old gold. */
+  --color-streak: #04774C;
+  --color-wins: #A1562C;
+}
+
+/* Reward moment — confetti fall. Single pass, no infinite loop: the card
+   waits for a tap, and a celebration that keeps emitting forever stops
+   reading as a moment and starts reading as a background. */
+@keyframes award-fall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { transform: translateY(420px) rotate(520deg); opacity: 0; }
+}
+
+@keyframes streak-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--color-streak-glow)); }
+  50% { filter: drop-shadow(0 0 20px var(--color-streak-glow)) drop-shadow(0 0 40px var(--color-accent)); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes confetti-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes loss-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes countdown-bar {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-streak-pulse {
+  animation: streak-pulse 2s ease-in-out infinite;
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+@utility animate-confetti-pop {
+  animation: confetti-pop 0.5s ease-out both;
+}
+
+@utility animate-loss-shake {
+  animation: loss-shake 0.5s ease-out;
+}
+
+@utility animate-countdown-bar {
+  animation: countdown-bar 5s linear forwards;
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.3s ease-out both;
+}
+
+
+/*
+ * Removed: .header-bar / .header-text / .header-streak-pill /
+ * .native-status-* and their `@container app (min-width: 1024px)` rule.
+ * No component referenced any of them — they were left behind by the desktop
+ * device-frame preview, which is gone.
+ */
+
+/*
+ * How To Play CTA — theme-adaptive
+ * Dark: #05A569 bg, black text
+ * Light: black bg, #05A569 text
+ */
+[data-theme="dark"] .htp-cta,
+:root .htp-cta {
+  background-color: #05A569;
+  color: #000000;
+}
+[data-theme="light"] .htp-cta {
+  background-color: #000000;
+  color: #05A569;
+}
+
+/*
+ * CTA Pill Button — matches Figma CTAs/In Card
+ * Outline pill: 28px tall, rounded-full, 1px border, 12px Benton Sans Medium
+ * Dark: white border + text on transparent bg
+ * Light: near-black (#101113) border + text on transparent bg
+ * Active/selected state: filled with primary text color, inverted text
+ */
+.cta-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 4px 16px;
+  border-radius: 100px;
+  border: 1px solid var(--color-theme-text);
+  background: transparent;
+  color: var(--color-theme-text);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.cta-pill:hover {
+  background-color: var(--color-theme-surface-alt);
+}
+
+.cta-pill:disabled {
+  cursor: not-allowed;
+}
+
+.cta-pill-active {
+  background-color: var(--color-theme-text);
+  color: var(--color-theme-bg);
+  border-color: var(--color-theme-text);
+}
+
+.cta-pill-active:hover {
+  background-color: var(--color-theme-text);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-body);
+  overscroll-behavior: none;
+  margin: 0;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-theme-scrollbar);
+  border-radius: 2px;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * App shell container — enables container queries for toast + team names
+ */
+.app-shell {
+  container-type: inline-size;
+  container-name: app;
+}
+
+/*
+ * Toast — responsive layout
+ *
+ * Mobile (< 600px): full-width card, stacked text, bottom of screen
+ * Tablet/Desktop (≥ 600px): compact inline pill, centered, bottom of screen
+ */
+.toast-card {
+  width: 100%;
+  max-width: 358px;
+  border-radius: 16px;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+/* Mobile: slide up from bottom */
+.toast-hidden {
+  transform: translateY(calc(100% + 24px));
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.55, 0, 1, 0.45), opacity 0.25s ease;
+}
+
+.toast-visible {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+}
+
+/*
+ * Removed: the `@container app (min-width: 600px)` block that moved the toast
+ * to top-right and slid it in from the side. Phone-only now, so the toast
+ * always rises from the bottom.
+ */
+
+/*
+ * Responsive team names — ESPN pattern
+ * Render all three variants, toggle visibility with container queries.
+ * The pick-card wrapper sets container-type: inline-size so we respond to
+ * the card's width, not the viewport.
+ *
+ * Phone-only now: one card per row, so at 390px the card is ~370px and the
+ * full-name variant is what renders. The narrower breakpoints below are kept
+ * because they still fire on small phones (SE at 320px) and inside the
+ * pick-history rows.
+ *
+ * < 240px  → abbreviation only  (DAL, GSW, S. Scheffler)
+ * 240–419px → short name         (Mavericks, Warriors, S. Scheffler)
+ * ≥ 420px  → full name          (Dallas Mavericks, Golden State Warriors)
+ */
+.pick-card-container {
+  container-type: inline-size;
+}
+
+.team-name-full,
+.team-name-short,
+.team-name-abbr {
+  display: none !important;
+}
+
+/* Default (narrowest): show abbreviation */
+.team-name-abbr {
+  display: block !important;
+}
+
+@container (min-width: 240px) {
+  .team-name-abbr { display: none !important; }
+  .team-name-short { display: block !important; }
+}
+
+@container (min-width: 420px) {
+  .team-name-short { display: none !important; }
+  .team-name-full { display: block !important; }
+}
+
+/*
+ * Entry Card — Fire Effect Animations
+ * Progressive intensity based on streak length via BEM-style state classes.
+ */
+
+/* DK Crown logo — theme-adaptive via currentColor */
+.entry-card__dk-logo {
+  color: var(--color-theme-text-tertiary);
+}
+
+/* Shared particle layer styles */
+.entry-card__embers,
+.entry-card__flames,
+.entry-card__inferno {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* --- WARM (streak 3–4): sparse slow embers --- */
+.entry-card--warm {
+  border-color: color-mix(in srgb, var(--color-streak-glow) 30%, var(--color-theme-border));
+}
+
+.entry-card--warm .entry-card__embers::before,
+.entry-card--warm .entry-card__embers::after {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-wins);
+  opacity: 0;
+  animation: ember-rise 3s ease-out infinite;
+}
+
+.entry-card--warm .entry-card__embers::before {
+  left: 20%;
+  bottom: 0;
+  animation-delay: 0s;
+}
+
+.entry-card--warm .entry-card__embers::after {
+  left: 70%;
+  bottom: 0;
+  animation-delay: 1.5s;
+}
+
+/* --- HOT (streak 5–6): more embers + flame wisps + orange glow border --- */
+.entry-card--hot {
+  border-color: var(--color-wins);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-wins) 40%, transparent),
+              inset 0 0 8px color-mix(in srgb, var(--color-wins) 10%, transparent);
+}
+
+.entry-card--hot .entry-card__embers::before,
+.entry-card--hot .entry-card__embers::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-wins);
+  opacity: 0;
+  animation: ember-rise 2.2s ease-out infinite;
+}
+
+.entry-card--hot .entry-card__embers::before {
+  left: 15%;
+  bottom: 0;
+  animation-delay: 0s;
+}
+
+.entry-card--hot .entry-card__embers::after {
+  left: 55%;
+  bottom: 0;
+  animation-delay: 0.8s;
+}
+
+.entry-card--hot .entry-card__embers {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-wins) 8%, transparent) 0%,
+    transparent 20%
+  );
+}
+
+/* --- BLAZING (streak 7–9): dense embers + visible flames + intense glow --- */
+.entry-card--blazing {
+  border-color: var(--color-streak-glow);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-streak-glow) 50%, transparent),
+              0 0 40px color-mix(in srgb, var(--color-wins) 25%, transparent),
+              inset 0 0 12px color-mix(in srgb, var(--color-wins) 15%, transparent);
+}
+
+.entry-card--blazing .entry-card__embers::before,
+.entry-card--blazing .entry-card__embers::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-streak-glow);
+  opacity: 0;
+  animation: ember-rise 1.8s ease-out infinite;
+}
+
+.entry-card--blazing .entry-card__embers::before {
+  left: 10%;
+  bottom: 0;
+  animation-delay: 0s;
+}
+
+.entry-card--blazing .entry-card__embers::after {
+  left: 45%;
+  bottom: 0;
+  animation-delay: 0.6s;
+}
+
+.entry-card--blazing .entry-card__flames {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-wins) 20%, transparent) 0%,
+    color-mix(in srgb, var(--color-streak-glow) 8%, transparent) 15%,
+    transparent 25%
+  );
+  animation: flame-flicker 2s ease-in-out infinite alternate;
+}
+
+/* --- INFERNO (streak 10+): maximum fire + shimmer + dense flames --- */
+.entry-card--inferno {
+  border-color: var(--color-streak-glow);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--color-streak-glow) 60%, transparent),
+              0 0 60px color-mix(in srgb, var(--color-wins) 35%, transparent),
+              inset 0 0 20px color-mix(in srgb, var(--color-wins) 20%, transparent);
+  animation: inferno-pulse 1.5s ease-in-out infinite alternate;
+}
+
+.entry-card--inferno .entry-card__embers::before,
+.entry-card--inferno .entry-card__embers::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-streak-glow);
+  opacity: 0;
+  animation: ember-rise 1.2s ease-out infinite;
+}
+
+.entry-card--inferno .entry-card__embers::before {
+  left: 8%;
+  bottom: 0;
+  animation-delay: 0s;
+}
+
+.entry-card--inferno .entry-card__embers::after {
+  left: 40%;
+  bottom: 0;
+  animation-delay: 0.4s;
+}
+
+.entry-card--inferno .entry-card__flames {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-wins) 30%, transparent) 0%,
+    color-mix(in srgb, var(--color-streak-glow) 15%, transparent) 20%,
+    transparent 35%
+  );
+  animation: flame-flicker 1.2s ease-in-out infinite alternate;
+}
+
+.entry-card--inferno .entry-card__inferno {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-streak-glow) 10%, transparent) 0%,
+    transparent 40%
+  );
+  animation: inferno-shimmer 0.8s ease-in-out infinite alternate;
+}
+
+/* Keyframes */
+@keyframes ember-rise {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-60px) scale(0.3) translateX(10px);
+    opacity: 0;
+  }
+}
+
+@keyframes flame-flicker {
+  0% {
+    opacity: 0.7;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1.05);
+  }
+}
+
+@keyframes inferno-pulse {
+  0% {
+    box-shadow: 0 0 30px color-mix(in srgb, var(--color-streak-glow) 60%, transparent),
+                0 0 60px color-mix(in srgb, var(--color-wins) 35%, transparent),
+                inset 0 0 20px color-mix(in srgb, var(--color-wins) 20%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 40px color-mix(in srgb, var(--color-streak-glow) 80%, transparent),
+                0 0 80px color-mix(in srgb, var(--color-wins) 50%, transparent),
+                inset 0 0 25px color-mix(in srgb, var(--color-wins) 30%, transparent);
+  }
+}
+
+@keyframes inferno-shimmer {
+  0% {
+    opacity: 0.6;
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(8px);
+  }
+}

@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users: read own profile, write own profile
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Picks: anyone authenticated can read (for pick %), write own picks
+    match /picks/{pickId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if false; // Only Cloud Functions can resolve picks
+    }
+
+    // Leaderboard: public read, no client writes
+    match /leaderboard/{entry} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Offerings: the question being asked, written once by whoever picks it
+    // first so the resolver has something to grade against.
+    //
+    // create-only by design. Anyone signed in may seed a question, but
+    // nobody may edit one after the fact — being able to move a line or a
+    // target after picks exist would let a client rewrite the terms of a bet
+    // that is already live. Corrections go through a Cloud Function, which
+    // bypasses these rules via the admin SDK.
+    match /offerings/{offeringId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+  }
+}
