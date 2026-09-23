@@ -1,0 +1,178 @@
+/* ============================================================================
+   Game Kit — token layer
+   ----------------------------------------------------------------------------
+   Shared visual language for Fantasy Next games and Streak.
+
+   IMPORTANT — which ESPN token source is canonical?
+
+   There are two in play, and they are not the same:
+
+     1. ESPN Design System (gitlab.disney.com/espn-design-system/tokens)
+        Ignite Display, Ignite Text Narrow, Benton Sans.
+        This is what Streak already uses. It is a maintained design-system
+        repo, so it is the upstream.
+
+     2. Fantasy app core.css (Project Cinco)
+        AppDefault, BentonSansCond-global, PlayoffProCond.
+        This is one application's stylesheet, not a design system.
+
+   This file is built on (1) and MAPS to (2), not the other way round. A game
+   running inside the fantasy app can opt into the Cinco type stack by setting
+   `data-typestack="cinco"` on a wrapper; everything else stays identical.
+
+   USAGE
+
+     Tailwind 4 (Streak):        @import "../game-kit/tokens.css";
+                                 the @theme block below registers the tokens,
+                                 so `bg-gk-surface`, `font-display` etc. work.
+     Plain HTML (prototypes):    <link rel="stylesheet" href="tokens.css">
+                                 the :root block gives you --gk-* variables.
+
+   Both blocks define the same values. The duplication is deliberate: Tailwind's
+   @theme is not readable as plain custom properties by a non-Tailwind page.
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- fonts ---
+   Design System faces. Self-host these for production: a gitlab.disney.com
+   URL will not resolve for a user outside the network, and @font-face fails
+   silently to the fallback, which is how a build ships looking wrong.
+   -------------------------------------------------------------------------- */
+@font-face{font-family:'ESPN Ignite Display';font-weight:900;font-style:normal;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/IgniteDisplay/IgniteDisplay-CondensedHeavy.woff2') format('woff2')}
+@font-face{font-family:'ESPN Ignite Display';font-weight:900;font-style:italic;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/IgniteDisplay/IgniteDisplay-CondensedHeavyItalic.woff2') format('woff2')}
+@font-face{font-family:'ESPN Ignite Text Narrow';font-weight:400;font-style:normal;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/IgniteTextNarrow/IgniteTextNarrow-Regular.woff2') format('woff2')}
+@font-face{font-family:'ESPN Ignite Text Narrow';font-weight:700;font-style:normal;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/IgniteTextNarrow/IgniteTextNarrow-Bold.woff2') format('woff2')}
+@font-face{font-family:'Benton Sans';font-weight:400;font-style:normal;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/BentonSans/BentonSans-Regular.woff2') format('woff2')}
+@font-face{font-family:'Benton Sans';font-weight:500;font-style:normal;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/BentonSans/BentonSans-Medium.woff2') format('woff2')}
+@font-face{font-family:'Benton Sans';font-weight:700;font-style:normal;font-display:swap;
+  src:url('https://gitlab.disney.com/espn-design-system/tokens/-/raw/main/packages/fonts/BentonSans/BentonSans-Bold.woff2') format('woff2')}
+
+:root{
+  /* ---- type ------------------------------------------------------------ */
+  --gk-font-display:'ESPN Ignite Display',Impact,'Arial Black',sans-serif;
+  --gk-font-title:'ESPN Ignite Text Narrow','Arial Narrow',Arial,sans-serif;
+  --gk-font-body:'Benton Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+
+  --gk-text-hero:900 clamp(34px,11vw,56px)/1.02 var(--gk-font-display);
+  --gk-text-title-1:900 30px/34px var(--gk-font-display);
+  --gk-text-title-2:700 20px/24px var(--gk-font-title);
+  --gk-text-title-3:700 14px/18px var(--gk-font-title);
+  --gk-text-body:400 16px/24px var(--gk-font-body);
+  --gk-text-callout:500 13px/16px var(--gk-font-body);
+  --gk-text-footnote:400 12px/16px var(--gk-font-body);
+  --gk-text-caption:700 10px/12px var(--gk-font-body);
+  /* scores, streak counts and countdowns: stops the layout jittering as
+     digits change, which matters most on a live timer */
+  --gk-numeric:tabular-nums;
+
+  /* ---- neutrals (Design System primitives) ---------------------------- */
+  --gk-n-0:#ffffff;   --gk-n-50:#f9f9f9;  --gk-n-100:#f5f5f5; --gk-n-200:#e0e0e0;
+  --gk-n-300:#cccccc; --gk-n-400:#999999; --gk-n-500:#808080; --gk-n-600:#666666;
+  --gk-n-700:#444444; --gk-n-800:#2a2a2a; --gk-n-850:#1e1e1e; --gk-n-900:#121212;
+  --gk-n-1000:#000000;
+
+  /* ---- brand ---------------------------------------------------------- */
+  --gk-espn-red:#f51825;
+  --gk-espn-gold:#ffc432;
+  --gk-accent:#FFDA18;
+  --gk-accent-light:#d9ff5c;
+
+  /* ---- semantic surfaces (dark is the default; games open from a dark tab) */
+  --gk-canvas:#0B0B0C;
+  --gk-surface:#17181A;
+  --gk-surface-alt:#202124;
+  --gk-border:#2E2F32;
+  --gk-border-strong:#3A3B3C;
+  --gk-ink:#F9F9FB;
+  --gk-ink-2:#A1A2A3;
+  --gk-ink-3:#6C6E6F;
+  --gk-action:#5990f6;
+
+  /* ---- state ---------------------------------------------------------- */
+  --gk-win:#51FF77;
+  --gk-loss:#ff3232;
+  --gk-warn:#ff7700;
+  --gk-live:#F35858;
+  --gk-streak:#FFDA18;
+  --gk-wins:#FF9151;
+
+  /* ---- space / radius / motion ---------------------------------------- */
+  --gk-1:2px;  --gk-2:4px;  --gk-3:8px;  --gk-4:12px; --gk-5:16px;
+  --gk-6:24px; --gk-7:32px; --gk-8:48px; --gk-9:64px;
+  --gk-r-sm:4px; --gk-r-md:8px; --gk-r-lg:14px; --gk-r-pill:999px;
+
+  --gk-dur-instant:80ms;   /* input acknowledgement - never slower */
+  --gk-dur-fast:160ms;
+  --gk-dur-medium:280ms;
+  --gk-dur-reveal:460ms;
+  --gk-ease-out:cubic-bezier(.22,.61,.36,1);
+  --gk-ease-spring:cubic-bezier(.34,1.42,.64,1);   /* the one celebratory curve */
+
+  /* minimum accessible hit target. Dense pick grids tempt you below it. */
+  --gk-hit:44px;
+
+  /* The ground that artwork sits on. Deliberately NOT theme-dependent: team
+     marks are colour-managed against white, so swapping ground by theme means
+     swapping asset variant, which changes crop coordinates. On a dark page,
+     mat it with .gk-mat rather than recolouring it. */
+  --gk-artwork-ground:#FFFFFF;
+}
+
+:root[data-theme="light"]{
+  --gk-canvas:#EDEEF0; --gk-surface:#FFFFFF; --gk-surface-alt:#F9F9FB;
+  --gk-border:#E0E0E0; --gk-border-strong:#CCCCCC;
+  --gk-ink:#121212; --gk-ink-2:#444444; --gk-ink-3:#808080;
+  --gk-action:#2358BA;
+  --gk-win:#056C07; --gk-loss:#D32F2F; --gk-streak:#8A6100;
+}
+
+/* Opt-in mapping to the fantasy app's own type stack, for a game rendered
+   inside the Cinco shell. Colours are unchanged; only the faces move. */
+[data-typestack="cinco"]{
+  --gk-font-display:'PlayoffProCond','ESPN Ignite Display',sans-serif;
+  --gk-font-title:'BentonSansCond-global','ESPN Ignite Text Narrow',sans-serif;
+  --gk-font-body:'AppDefault','Benton Sans',-apple-system,sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Tailwind 4 registration. Keeps the same values available as utilities:
+   text-gk-ink, bg-gk-surface, font-display, rounded-gk-lg, and so on.
+   ------------------------------------------------------------------------ */
+@theme {
+  --font-display:'ESPN Ignite Display',Impact,'Arial Black',sans-serif;
+  --font-title:'ESPN Ignite Text Narrow','Arial Narrow',Arial,sans-serif;
+  --font-body:'Benton Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+
+  --color-gk-canvas:#0B0B0C;
+  --color-gk-surface:#17181A;
+  --color-gk-surface-alt:#202124;
+  --color-gk-border:#2E2F32;
+  --color-gk-border-strong:#3A3B3C;
+  --color-gk-ink:#F9F9FB;
+  --color-gk-ink-2:#A1A2A3;
+  --color-gk-ink-3:#6C6E6F;
+  --color-gk-action:#5990f6;
+
+  --color-gk-win:#51FF77;
+  --color-gk-loss:#ff3232;
+  --color-gk-warn:#ff7700;
+  --color-gk-live:#F35858;
+  --color-gk-streak:#FFDA18;
+  --color-gk-wins:#FF9151;
+  --color-gk-accent:#FFDA18;
+  --color-gk-accent-light:#d9ff5c;
+  --color-gk-espn-red:#f51825;
+  --color-gk-espn-gold:#ffc432;
+
+  --radius-gk-sm:4px;
+  --radius-gk-md:8px;
+  --radius-gk-lg:14px;
+
+  --ease-gk-out:cubic-bezier(.22,.61,.36,1);
+  --ease-gk-spring:cubic-bezier(.34,1.42,.64,1);
+}

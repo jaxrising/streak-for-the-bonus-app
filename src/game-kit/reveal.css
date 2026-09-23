@@ -1,0 +1,108 @@
+/* ============================================================================
+   Game Kit — reveal treatment
+   ----------------------------------------------------------------------------
+   The blur/grain/sheen look from Daily Visual ID, extracted so any game can
+   use it. Framework-agnostic: plain CSS classes, no build step.
+
+   WHAT IT IS, AND WHY IT IS BUILT THIS WAY
+
+   A plain `filter: blur()` reads as a low-resolution asset rather than a
+   deliberate effect. Three layers fix that:
+
+     1. blur      on the image itself, animatable, GPU-composited
+     2. grain     an SVG fractal-noise tile, blended `overlay`
+     3. sheen     a soft diagonal gradient, blended `soft-light`
+
+   Grain and sheen are STATIC OVERLAY LAYERS, not filters. That is a
+   performance decision: an SVG filter (feTurbulence + feDisplacementMap) gives
+   a richer, organically-warped result, but it re-evaluates on every frame of a
+   transform animation and janks on mid-range Android, where `transform` alone
+   does not. If you want the warp, bake it into the asset at build time.
+
+   Blur radii are authored against a 340px reference frame and scaled to the
+   rendered width in JS, so difficulty does not drift between a phone and a
+   desktop. Do not hard-code pixel blur.
+
+   MARKUP
+
+     <div class="gk-frame" data-stage="0">
+       <img src="...">
+       <div class="gk-sheen"></div>
+       <div class="gk-grain"></div>
+     </div>
+
+   Then drive it from JS (see setStage() in reveal.ts).
+
+   THE ONE HARD RULE
+
+   The final stage is never blurred. The resolve must show the artwork
+   unmodified — it is the payoff, and it is also the cleaner licensing position
+   for a partner's mark: the blur is a disclosure mechanism, not a presentation.
+   ========================================================================= */
+
+.gk-frame{
+  position:relative;
+  aspect-ratio:1;
+  overflow:hidden;
+  border-radius:var(--gk-r-md,8px);
+  /* The artwork ground does NOT follow the theme. Marks are colour-managed
+     against white, so a theme-coloured ground means swapping asset variant,
+     which changes the crop coordinates, which changes the puzzle. */
+  background:var(--gk-artwork-ground,#FFFFFF);
+  border:1px solid var(--gk-border-strong,#3A3B3C);
+}
+
+/* On a dark page a white ground reads as a hole punched in the layout. Mat it:
+   inset the frame inside a surface-coloured card, the way a gallery hangs a
+   white print on a dark wall. */
+.gk-mat{
+  padding:var(--gk-3,8px);
+  border-radius:var(--gk-r-lg,14px);
+  background:var(--gk-surface,#17181A);
+  border:1px solid var(--gk-border,#2E2F32);
+}
+
+.gk-frame > img{
+  position:absolute; left:0; top:0; width:100%; height:100%;
+  object-fit:contain;
+  transform-origin:0 0;
+  will-change:transform,opacity,filter;
+  transition:transform var(--gk-dur-reveal,460ms) var(--gk-ease-out,ease-out),
+             opacity   var(--gk-dur-reveal,460ms) var(--gk-ease-out,ease-out),
+             filter    var(--gk-dur-reveal,460ms) var(--gk-ease-out,ease-out);
+}
+/* multi-layer crossfade, for a reveal that changes source image (e.g. rotating
+   through camera angles rather than zooming out) */
+.gk-frame > img[data-off]{opacity:0}
+
+/* ---- polish layers ------------------------------------------------------ */
+.gk-grain,.gk-sheen{
+  position:absolute; inset:0; pointer-events:none; opacity:0;
+  transition:opacity var(--gk-dur-reveal,460ms) var(--gk-ease-out,ease-out);
+}
+.gk-grain{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
+  background-size:200px 200px;
+  mix-blend-mode:overlay;
+}
+.gk-sheen{
+  mix-blend-mode:soft-light;
+  background:linear-gradient(118deg,
+    rgba(255,255,255,.55) 0%,
+    rgba(255,255,255,0) 42%,
+    rgba(0,0,0,.34) 100%);
+}
+
+/* Grain and a translucent sheen are exactly what a reduced-transparency
+   preference is asking us not to do. */
+@media (prefers-reduced-transparency:reduce){
+  .gk-grain,.gk-sheen{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .gk-frame > img,.gk-grain,.gk-sheen{transition-duration:1ms}
+}
+
+/* ---- optional: the reveal pips ----------------------------------------- */
+.gk-pips{display:flex;justify-content:center;gap:6px}
+.gk-pips i{width:26px;height:4px;border-radius:2px;background:var(--gk-border-strong,#3A3B3C)}
+.gk-pips i[data-on]{background:var(--gk-action,#5990f6)}

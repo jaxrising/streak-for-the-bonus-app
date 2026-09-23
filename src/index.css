@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@import "../../../game-kit/tokens.css";
-@import "../../../game-kit/reveal.css";
+@import "./game-kit/tokens.css";
+@import "./game-kit/reveal.css";
 
 /* ============================================================================
    Self-hosted display faces
