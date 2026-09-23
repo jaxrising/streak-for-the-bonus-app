@@ -1,5 +1,6 @@
 import type { Offering, PickSide } from '../types';
 import { useGameStore } from '../store/gameStore';
+import { etDayKey } from '../lib/timeFormat';
 import SportIcon from './SportIcon';
 
 interface PickCardProps {
@@ -229,7 +230,14 @@ export default function PickCard({ offering, index }: PickCardProps) {
   const { pendingSelection, submitted, submittedPick, selectPick, pickHistory } = useGameStore();
   const activeSelection = submitted ? submittedPick : pendingSelection;
   const isLocked = offering.startTimeISO ? new Date(offering.startTimeISO) <= new Date() : false;
-  const isDisabled = submitted || isLocked;
+  /*
+   * Streak is one pick at a time — the day nav lets a player look ahead to
+   * Friday's slate from a Tuesday, but locking that pick in five days early
+   * would tie up their only active pick on a game that has not moved yet.
+   * Viewing stays open; picking opens on the game's own ET calendar day.
+   */
+  const isFutureDay = offering.startTimeISO ? etDayKey(offering.startTimeISO) > etDayKey(new Date()) : false;
+  const isDisabled = submitted || isLocked || isFutureDay;
   const isHeadshot = HEADSHOT_SPORTS.has(offering.sport) && !offering.noSideArt;
 
   /*
