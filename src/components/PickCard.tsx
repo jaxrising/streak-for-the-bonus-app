@@ -252,6 +252,15 @@ export default function PickCard({ offering, index }: PickCardProps) {
   const isHeadshot = HEADSHOT_SPORTS.has(offering.sport) && !offering.noSideArt;
 
   /*
+   * Moneyline price, shown in the same pre-submit slot a total/milestone
+   * card uses for its stat line. The odds were always computed
+   * (buildLineOfferings sets oddsA/oddsB) but never rendered anywhere, so a
+   * team-v-team card showed a real DraftKings price nowhere on it.
+   */
+  const displayStatA = offering.kind === 'moneyline' ? offering.oddsA : offering.statA;
+  const displayStatB = offering.kind === 'moneyline' ? offering.oddsB : offering.statB;
+
+  /*
    * Did the player pick this one, and did it land?
    *
    * Read from pickHistory rather than from the offering, because the result
@@ -400,12 +409,29 @@ export default function PickCard({ offering, index }: PickCardProps) {
               style={{ backgroundColor: 'var(--color-theme-surface-alt)' }}
             />
           )}
-          <p
-            className="text-[14px] leading-[19px] font-title font-bold min-w-0"
-            style={{ color: 'var(--color-theme-text)' }}
-          >
-            {offering.question}
-          </p>
+          <div className="min-w-0">
+            <p
+              className="text-[14px] leading-[19px] font-title font-bold min-w-0"
+              style={{ color: 'var(--color-theme-text)' }}
+            >
+              {offering.question}
+            </p>
+            {/*
+              Milestone questions name a player and a stat, never a game — so
+              without this a slate with three "150+ passing yards?" cards
+              across three different Sunday games is unreadable. Total's
+              question already says "Falcons @ Packers — total points", so
+              this only fires where it would actually add information.
+            */}
+            {offering.kind === 'milestone' && offering.gameLabel && (
+              <p
+                className="text-[11px] leading-[14px] font-body mt-0.5"
+                style={{ color: 'var(--color-theme-text-muted)' }}
+              >
+                {offering.gameLabel}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -415,7 +441,7 @@ export default function PickCard({ offering, index }: PickCardProps) {
           shortLabel={offering.shortA}
           abbrLabel={offering.abbrA}
           pickPct={submitted ? offering.pickPctA : undefined}
-          stat={offering.statA}
+          stat={displayStatA}
           image={offering.noSideArt ? undefined : offering.imageA}
           color={offering.colorA}
           isHeadshot={isHeadshot}
@@ -432,7 +458,7 @@ export default function PickCard({ offering, index }: PickCardProps) {
           shortLabel={offering.shortB}
           abbrLabel={offering.abbrB}
           pickPct={submitted ? offering.pickPctB : undefined}
-          stat={offering.statB}
+          stat={displayStatB}
           image={offering.noSideArt ? undefined : offering.imageB}
           color={offering.colorB}
           isHeadshot={isHeadshot}

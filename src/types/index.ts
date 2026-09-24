@@ -64,6 +64,16 @@ export interface Offering {
   noSideArt?: boolean;
 
   /**
+   * "Falcons @ Packers" — which real game a player prop belongs to.
+   *
+   * A moneyline or total card's question already names both teams, so this
+   * is unused there. A milestone card's question is just the player and the
+   * stat ("Jordan Love — 14+ completions?"), which says nothing about which
+   * of the day's games it comes from.
+   */
+  gameLabel?: string;
+
+  /**
    * Which option actually won, once the game has finished.
    *
    * Needed for the "you didn't pick this one" state: the board greys the

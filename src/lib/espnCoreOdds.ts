@@ -446,7 +446,18 @@ interface PropItem {
 }
 
 const athleteCache = new Map<string, { name: string; short: string; headshot?: string } | null>();
-const hitRateCache = new Map<string, { hit: number; of: number } | null>();
+const gameLogCache = new Map<string, { vals: number[]; perEvent: Map<string, number> } | null>();
+
+/**
+ * The steepest a milestone is allowed to be, expressed as American odds.
+ *
+ * -300 implies a 75% win probability. DraftKings' propBets feed carries no
+ * price at all (see the module comment), so this is checked against the
+ * measured hit rate instead — the same number the card already shows as
+ * "N of M games". Below this, a "150+ passing yards" line for a starting QB
+ * clears in essentially every game, which is a free win dressed as a pick.
+ */
+const MAX_HIT_RATE = 0.75;
 
 /**
  * Parse one game log cell.
@@ -473,27 +484,23 @@ async function resolveAthlete(ref: string) {
 }
 
 /**
- * How often this player actually cleared this number.
+ * This player's season game log for one stat, as raw per-game values.
  *
- * Pulls the season game log and counts games at or above the target. Where a
- * price would have encoded the difficulty, this states it — and it is the
- * thing the card shows, so the number the player reads is the number the
- * resolver uses.
+ * Pulls every game once and caches it unkeyed by target, so picking the
+ * right rung off a 25-step ladder (150, 160, 170… 390 passing yards) costs
+ * one fetch instead of one per rung. Where a price would have encoded
+ * difficulty, this states it directly — the number the card shows is the
+ * number the resolver settles against.
  *
- * Current season is usually a small sample this early, so the previous season
- * is appended when needed.
+ * Current season is usually a small sample this early, so the previous
+ * season is appended when needed.
  */
-async function fetchHitRate(
-  sportPath: string,
-  athleteId: string,
-  statKey: string,
-  target: number,
-  perEvent: Map<string, number> = new Map()
-) {
-  const cacheKey = `${athleteId}|${statKey}|${target}`;
-  if (hitRateCache.has(cacheKey)) return hitRateCache.get(cacheKey)!;
+async function fetchGameLog(sportPath: string, athleteId: string, statKey: string) {
+  const cacheKey = `${athleteId}|${statKey}`;
+  if (gameLogCache.has(cacheKey)) return gameLogCache.get(cacheKey)!;
 
   const season = new Date().getFullYear();
+  const perEvent = new Map<string, number>();
   const collect = async (yr?: number) => {
     const url = `${WEB}/${sportPath}/athletes/${athleteId}/gamelog${yr ? `?season=${yr}` : ''}`;
     const g = await getJSON<{
@@ -521,9 +528,13 @@ async function fetchHitRate(
   let vals = await collect();
   if (vals.length < MIN_GAMES) vals = vals.concat(await collect(season - 1));
 
-  const val = vals.length ? { hit: vals.filter((v) => v >= target).length, of: vals.length } : null;
-  hitRateCache.set(cacheKey, val);
+  const val = vals.length ? { vals, perEvent } : null;
+  gameLogCache.set(cacheKey, val);
   return val;
+}
+
+function hitRateAt(vals: number[], target: number) {
+  return { hit: vals.filter((v) => v >= target).length, of: vals.length };
 }
 
 async function buildMilestoneOfferings(
@@ -558,12 +569,25 @@ async function buildMilestoneOfferings(
    * type is not always "Hits" — otherwise every game leads with whatever
    * happens to sort first and the board is varied within a game but
    * monotonous across them.
+   *
+   * Grouped one level deeper than before: type -> athlete -> the athlete's
+   * full ladder of rungs for that type. DraftKings' propBets feed returns
+   * EVERY round-number threshold ("150+", "160+", ... "390+" passing yards)
+   * as its own untyped, unpriced item, not just the one DK actually prices
+   * as its current line. Picking the first one encountered — the old
+   * behaviour — meant whichever rung happened to sort first, which was
+   * usually the easiest: a 150+ passing yard prop for a starting QB clears
+   * in nearly every game. The ladder is kept intact here so a rung can be
+   * chosen deliberately below.
    */
-  const byType = new Map<string, PropItem[]>();
+  const byType = new Map<string, Map<string, PropItem[]>>();
   for (const p of usable) {
-    const n = p.type!.name;
-    if (!byType.has(n)) byType.set(n, []);
-    byType.get(n)!.push(p);
+    const t = p.type!.name;
+    const a = p.athlete!.$ref;
+    if (!byType.has(t)) byType.set(t, new Map());
+    const byAthlete = byType.get(t)!;
+    if (!byAthlete.has(a)) byAthlete.set(a, []);
+    byAthlete.get(a)!.push(p);
   }
 
   const types = [...byType.keys()].sort();
@@ -571,42 +595,76 @@ async function buildMilestoneOfferings(
   const rotated = [...types.slice(offset), ...types.slice(0, offset)];
 
   const usedAthletes = new Set<string>();
-  const picked: PropItem[] = [];
+  const picked: { type: string; ladder: PropItem[] }[] = [];
   for (const t of rotated) {
     if (picked.length >= perGame) break;
     // Within a type, prefer a player this game has not already asked about.
-    const pool = byType.get(t)!;
-    const choice = pool.find((p) => !usedAthletes.has(p.athlete!.$ref)) ?? pool[0];
-    usedAthletes.add(choice.athlete!.$ref);
-    picked.push(choice);
+    const byAthlete = byType.get(t)!;
+    const athleteRefs = [...byAthlete.keys()];
+    const chosenRef = athleteRefs.find((r) => !usedAthletes.has(r)) ?? athleteRefs[0];
+    usedAthletes.add(chosenRef);
+    picked.push({ type: t, ladder: byAthlete.get(chosenRef)! });
   }
 
   const away = teamOf(ev, 'away');
   const home = teamOf(ev, 'home');
+  const gameLabel = `${away.shortDisplayName} @ ${home.shortDisplayName}`;
 
-  const built = await mapLimit(picked, 4, async (p) => {
-    const meta = statMap[p.type!.name];
-    const target = p.current!.target!.value;
-    const athleteId = p.athlete!.$ref.split('/athletes/')[1]?.split('?')[0];
+  const built = await mapLimit(picked, 4, async ({ type, ladder }) => {
+    const meta = statMap[type];
+    const athleteRef = ladder[0].athlete!.$ref;
+    const athleteId = athleteRef.split('/athletes/')[1]?.split('?')[0];
     if (!athleteId) return null;
 
-    const perEvent = new Map<string, number>();
-    const [who, rate] = await Promise.all([
-      resolveAthlete(p.athlete!.$ref),
-      fetchHitRate(lg.path, athleteId, meta.key, target, perEvent),
+    const [who, log] = await Promise.all([
+      resolveAthlete(athleteRef),
+      fetchGameLog(lg.path, athleteId, meta.key),
     ]);
     if (!who) return null;
 
-    const enough = rate && rate.of >= MIN_GAMES;
-    const prob = enough ? rate!.hit / rate!.of : MILESTONE_PRIOR;
-    const stat = enough ? `${rate!.hit} of ${rate!.of} games` : 'not enough games yet';
+    const enough = log != null && log.vals.length >= MIN_GAMES;
+
+    /*
+     * Walk the ladder easiest -> hardest, stop at the first rung whose
+     * measured hit rate is at or under the -300 cap.
+     *
+     * That is the LEAST easy line that still respects the boundary, which
+     * keeps it close to what a real book would price rather than jumping
+     * straight to the hardest number on the sheet. If this player clears
+     * even the hardest rung more than 75% of the time, there is no rung
+     * that satisfies the cap — fall back to the hardest available, since
+     * that is the closest this ladder gets.
+     */
+    const sorted = [...ladder].sort(
+      (a, b) => a.current!.target!.value - b.current!.target!.value
+    );
+    let chosen = sorted[sorted.length - 1];
+    if (enough) {
+      for (const rung of sorted) {
+        const { hit, of } = hitRateAt(log!.vals, rung.current!.target!.value);
+        if (hit / of <= MAX_HIT_RATE) {
+          chosen = rung;
+          break;
+        }
+      }
+    } else {
+      // No usable sample yet — the middle of the ladder is a safer default
+      // than either end until there is data to pick deliberately.
+      chosen = sorted[Math.floor(sorted.length / 2)];
+    }
+
+    const target = chosen.current!.target!.value;
+    const rate = enough ? hitRateAt(log!.vals, target) : null;
+    const prob = rate ? rate.hit / rate.of : MILESTONE_PRIOR;
+    const stat = rate ? `${rate.hit} of ${rate.of} games` : 'not enough games yet';
 
     const o: Offering = {
-      id: `ms-${ev.id}-${athleteId}-${p.type!.id}-${target}`,
+      id: `ms-${ev.id}-${athleteId}-${chosen.type!.id}-${target}`,
       sport: lg.sport,
       league: lg.league,
       kind: 'milestone',
       question: `${who.name} — ${target}+ ${meta.noun}?`,
+      gameLabel,
       optionA: 'Yes',
       optionB: 'No',
       shortA: 'Yes',
@@ -620,7 +678,7 @@ async function buildMilestoneOfferings(
       // invented one would be worse than none.
       winProbA: prob,
       statA: stat,
-      statB: enough ? `missed in ${rate!.of - rate!.hit}` : 'not enough games yet',
+      statB: rate ? `missed in ${rate.of - rate.hit}` : 'not enough games yet',
       pickPctA: Math.round(prob * 100),
       pickPctB: 100 - Math.round(prob * 100),
       startTime: formatLockET(comp.startDate),
@@ -638,7 +696,7 @@ async function buildMilestoneOfferings(
       // against the number the question asked about. A = Yes, B = No.
       correctSide: (() => {
         if (!isFinal(ev)) return undefined;
-        const actual = perEvent.get(ev.id);
+        const actual = log?.perEvent.get(ev.id);
         if (actual == null) return undefined;
         return actual >= target ? 'A' : 'B';
       })(),
