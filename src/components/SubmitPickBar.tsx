@@ -1,7 +1,7 @@
 import { useGameStore } from '../store/gameStore';
 
 export default function SubmitPickBar() {
-  const { pendingSelection, submitted, submittedPick, submitPick } = useGameStore();
+  const { pendingSelection, submittedPick, submitPick } = useGameStore();
 
   return (
     <div
@@ -18,7 +18,28 @@ export default function SubmitPickBar() {
         only to dodge the 300px sidebar, which is gone.
       */}
       <div className="px-[10px] flex items-center justify-between h-[56px] gap-3">
-        {submitted && submittedPick ? (
+        {/*
+          pendingSelection checked first, not "was anything submitted
+          today" — Streak runs several pick windows a day, so tapping a
+          fresh, not-yet-submitted card must show ITS picking state even
+          after an earlier window this same day was already submitted.
+        */}
+        {pendingSelection ? (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-body font-medium text-white">
+                Your pick: <span className="font-bold">{pendingSelection.chosenOption}</span>
+              </span>
+            </div>
+            <button
+              onClick={submitPick}
+              className="flex items-center justify-center h-[32px] px-8 rounded-full text-[12px] leading-[14px] font-medium font-body transition-all"
+              style={{ backgroundColor: '#5990f6', color: '#101113', cursor: 'pointer' }}
+            >
+              Submit My Pick
+            </button>
+          </>
+        ) : submittedPick ? (
           <>
             <div className="flex items-center gap-2">
               <span className="text-[12px] font-body font-medium text-white">
@@ -26,27 +47,16 @@ export default function SubmitPickBar() {
               </span>
             </div>
             <span className="text-[12px] font-body text-[#6C6D6F]">
-              Pick submitted! Come back tomorrow.
+              Pick submitted! Check today's other windows.
             </span>
           </>
         ) : (
           <>
-            <div className="flex items-center gap-2">
-              {pendingSelection && (
-                <span className="text-[12px] font-body font-medium text-white">
-                  Your pick: <span className="font-bold">{pendingSelection.chosenOption}</span>
-                </span>
-              )}
-            </div>
+            <div className="flex items-center gap-2" />
             <button
-              onClick={submitPick}
-              disabled={!pendingSelection}
+              disabled
               className="flex items-center justify-center h-[32px] px-8 rounded-full text-[12px] leading-[14px] font-medium font-body transition-all"
-              style={{
-                backgroundColor: pendingSelection ? '#5990f6' : '#3A3B3C',
-                color: pendingSelection ? '#101113' : '#6C6D6F',
-                cursor: pendingSelection ? 'pointer' : 'not-allowed',
-              }}
+              style={{ backgroundColor: '#3A3B3C', color: '#6C6D6F', cursor: 'not-allowed' }}
             >
               Submit My Pick
             </button>

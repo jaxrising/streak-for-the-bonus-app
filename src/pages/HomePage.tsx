@@ -1,7 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
+import type { Offering } from '../types';
 import { useGameStore } from '../store/gameStore';
 import { useOfferings } from '../lib/useOfferings';
 import { checkGameResults, determinePickOutcome } from '../lib/resolveFromResults';
+import { fetchPrimetimeOfferings } from '../lib/espnCoreOdds';
+import { buildDailyWindows } from '../lib/pickWindows';
 import EntryCard from '../components/EntryCard';
 import PickCard from '../components/PickCard';
 import SportFilterChips, { type SportFilter } from '../components/SportFilterChips';
@@ -14,6 +17,28 @@ export default function HomePage() {
   const { activePick, resolvePick, resetDemo } = useGameStore();
   const { offerings, loading } = useOfferings();
   const [sportFilter, setSportFilter] = useState<SportFilter>('all');
+
+  /*
+   * Primetime period windows (1st half / 2nd half), fetched per day from
+   * primetimeSchedule.ts. Cheap for every day but the configured one or two
+   * — fetchPrimetimeOfferings returns [] with no network call when a day
+   * has no schedule entry.
+   */
+  const [primetimeByDay, setPrimetimeByDay] = useState<Record<string, Offering[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const days = getPeriodDays().map((d) => d.key);
+      const entries = await Promise.all(
+        days.map(async (k) => [k, await fetchPrimetimeOfferings(k)] as const)
+      );
+      if (!cancelled) setPrimetimeByDay(Object.fromEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /*
    * Day first, league second.
@@ -39,13 +64,30 @@ export default function HomePage() {
     return map;
   }, [offerings]);
 
+  /*
+   * The curated slate, not the raw board.
+   *
+   * Streak's strategy comes from a small deliberate set of picking
+   * opportunities across the day, not from a menu of every market on every
+   * game — see buildDailyWindows. Everything downstream (league chips,
+   * counts, the grid itself) reads from this, not from offeringsByDay
+   * directly.
+   */
+  const windowsByDay = useMemo(() => {
+    const map: Record<string, Offering[]> = {};
+    for (const d of getPeriodDays()) {
+      map[d.key] = buildDailyWindows(d.key, offeringsByDay[d.key] ?? [], primetimeByDay[d.key] ?? []);
+    }
+    return map;
+  }, [offeringsByDay, primetimeByDay]);
+
   const dayCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const d of getPeriodDays()) counts[d.key] = offeringsByDay[d.key]?.length ?? 0;
+    for (const d of getPeriodDays()) counts[d.key] = windowsByDay[d.key]?.length ?? 0;
     return counts;
-  }, [offeringsByDay]);
+  }, [windowsByDay]);
 
-  const dayOfferings = useMemo(() => offeringsByDay[selectedDay] ?? [], [offeringsByDay, selectedDay]);
+  const dayOfferings = useMemo(() => windowsByDay[selectedDay] ?? [], [windowsByDay, selectedDay]);
 
   const availableLeagues = useMemo(() => {
     return [...new Set(dayOfferings.map(o => o.league))];
@@ -72,7 +114,12 @@ export default function HomePage() {
     if (import.meta.env.VITE_USE_FIREBASE === 'true') return;
     if (!activePick) return;
 
-    const offering = offerings.find((o) => o.id === activePick.offeringId);
+    // Primetime period offerings live outside `offerings` (they come from
+    // primetimeByDay, not useOfferings), so an active pick on one of those
+    // needs to be looked up there too.
+    const offering =
+      offerings.find((o) => o.id === activePick.offeringId) ??
+      Object.values(primetimeByDay).flat().find((o) => o.id === activePick.offeringId);
     if (!offering) return;
 
     let cancelled = false;
@@ -96,7 +143,7 @@ export default function HomePage() {
     pollForResult();
 
     return () => { cancelled = true; };
-  }, [activePick, resolvePick, offerings]);
+  }, [activePick, resolvePick, offerings, primetimeByDay]);
 
   return (
     <div className="space-y-5">

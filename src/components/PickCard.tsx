@@ -238,17 +238,25 @@ function PickButton({
 }
 
 export default function PickCard({ offering, index }: PickCardProps) {
-  const { pendingSelection, submitted, submittedPick, selectPick, pickHistory, showFutureDayNotice } = useGameStore();
-  const activeSelection = submitted ? submittedPick : pendingSelection;
+  const { pendingSelection, submittedPicks, selectPick, pickHistory, showFutureDayNotice } = useGameStore();
+  /*
+   * A window is submitted once, forever — this card's own submission, not
+   * whether anything else today has been. Streak runs several pick windows
+   * a day, so a submitted moneyline pick this morning must not disable
+   * tonight's primetime window; only that same offering being resubmitted
+   * is blocked here.
+   */
+  const submittedForThis = submittedPicks[offering.id];
+  const isPendingHere = pendingSelection?.offeringId === offering.id;
   const isLocked = offering.startTimeISO ? new Date(offering.startTimeISO) <= new Date() : false;
   /*
-   * Streak is one pick at a time — the day nav lets a player look ahead to
-   * Friday's slate from a Tuesday, but locking that pick in five days early
-   * would tie up their only active pick on a game that has not moved yet.
-   * Viewing stays open; picking opens on the game's own ET calendar day.
+   * The day nav lets a player look ahead to Friday's slate from a Tuesday,
+   * but picking a window five days early would lock in an answer on a game
+   * that has not moved yet. Viewing stays open; picking opens on the game's
+   * own ET calendar day.
    */
   const isFutureDay = offering.startTimeISO ? etDayKey(offering.startTimeISO) > etDayKey(new Date()) : false;
-  const isDisabled = submitted || isLocked || isFutureDay;
+  const isDisabled = submittedForThis != null || isLocked || isFutureDay;
   const isHeadshot = HEADSHOT_SPORTS.has(offering.sport) && !offering.noSideArt;
 
   /*
@@ -265,9 +273,9 @@ export default function PickCard({ offering, index }: PickCardProps) {
    *
    * Read from pickHistory rather than from the offering, because the result
    * belongs to the player's record, not to the matchup. Most locked cards
-   * have no record at all — Streak is one pick at a time, so on any given day
-   * the vast majority of the board went unplayed. Those stay plainly locked;
-   * only a card that was actually picked earns a result treatment.
+   * have no record at all — only today's curated windows get picked, so
+   * everything else on a past day's board stays plainly locked; only a
+   * card that was actually picked earns a result treatment.
    */
   const record = pickHistory.find((r) => r.offeringId === offering.id && r.status !== 'pending');
   const result: 'won' | 'lost' | null =
@@ -279,11 +287,11 @@ export default function PickCard({ offering, index }: PickCardProps) {
    *
    * On a resolved card that is the side you PICKED, taken from the history
    * record — otherwise "Correct" sits above two identical-looking buttons and
-   * never says what you were correct about. On a live card it is the current
-   * selection, as before.
+   * never says what you were correct about. Otherwise this offering's own
+   * submission if it has one, else whatever's currently pending on it.
    */
-  const isSelected = result ? true : activeSelection?.offeringId === offering.id;
-  const selectedSide = result ? record!.side : activeSelection?.side;
+  const isSelected = result ? true : submittedForThis != null || isPendingHere;
+  const selectedSide = result ? record!.side : submittedForThis?.side ?? pendingSelection?.side;
   const markColor = result ? resultColor : '#FFFFFF';
 
   /*
@@ -388,9 +396,12 @@ export default function PickCard({ offering, index }: PickCardProps) {
 
         Shown only for the kinds whose buttons do not self-describe. On a
         moneyline card the team names are already the question, and repeating
-        "Who wins? Falcons @ Packers" above them is noise.
+        "Who wins? Falcons @ Packers" above them is noise. A period card's
+        buttons are ALSO just team names, but "Falcons" / "Packers" alone
+        does not say whether this is the full game, the 1st half or the 2nd
+        — that distinction only exists in the question text.
       */}
-      {(offering.kind === 'milestone' || offering.kind === 'total') && (
+      {(offering.kind === 'milestone' || offering.kind === 'total' || offering.kind === 'period') && (
         <div className="flex items-center gap-2.5 mb-2.5">
           {/*
             Headshot sits with the question, not on the buttons. A player prop
@@ -440,7 +451,7 @@ export default function PickCard({ offering, index }: PickCardProps) {
           label={offering.optionA}
           shortLabel={offering.shortA}
           abbrLabel={offering.abbrA}
-          pickPct={submitted ? offering.pickPctA : undefined}
+          pickPct={submittedForThis ? offering.pickPctA : undefined}
           stat={displayStatA}
           image={offering.noSideArt ? undefined : offering.imageA}
           color={offering.colorA}
@@ -457,7 +468,7 @@ export default function PickCard({ offering, index }: PickCardProps) {
           label={offering.optionB}
           shortLabel={offering.shortB}
           abbrLabel={offering.abbrB}
-          pickPct={submitted ? offering.pickPctB : undefined}
+          pickPct={submittedForThis ? offering.pickPctB : undefined}
           stat={displayStatB}
           image={offering.noSideArt ? undefined : offering.imageB}
           color={offering.colorB}

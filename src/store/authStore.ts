@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { onAuthChange } from '../firebase/auth';
 import { getOrCreateUser, type UserProfile } from '../firebase/collections';
 import { db } from '../firebase/config';
 import { useGameStore } from './gameStore';
+import { etDayKey } from '../lib/timeFormat';
 
 export interface AuthUser {
   uid: string;
@@ -60,25 +61,38 @@ export function initAuth() {
           initialized: true,
         });
 
-        // Restore today's active pick
+        // Restore every window submitted today — one doc per offeringId,
+        // not a single 'current' doc, since several can be active the same
+        // day (see gameStore.submitPick).
         try {
-          const pickSnap = await getDoc(doc(db, 'users', firebaseUser.uid, 'activePick', 'current'));
-          if (pickSnap.exists()) {
-            const data = pickSnap.data();
-            const today = new Date().toISOString().split('T')[0];
-            if (data.date === today) {
-              useGameStore.setState({
-                submitted: true,
-                submittedPick: {
+          const today = etDayKey(new Date());
+          const snap = await getDocs(
+            query(collection(db, 'users', firebaseUser.uid, 'activePick'), where('date', '==', today))
+          );
+          if (!snap.empty) {
+            const submittedPicks: Record<string, { side: 'A' | 'B'; chosenOption: string }> = {};
+            let mostRecent: { offeringId: string; side: 'A' | 'B'; chosenOption: string; startedAt: number } | null = null;
+            for (const d of snap.docs) {
+              const data = d.data();
+              submittedPicks[data.offeringId] = { side: data.side, chosenOption: data.chosenOption };
+              if (!mostRecent || data.startedAt > mostRecent.startedAt) {
+                mostRecent = {
                   offeringId: data.offeringId,
                   side: data.side,
                   chosenOption: data.chosenOption,
-                },
-              });
+                  startedAt: data.startedAt,
+                };
+              }
             }
+            useGameStore.setState({
+              submittedPicks,
+              submittedPick: mostRecent
+                ? { offeringId: mostRecent.offeringId, side: mostRecent.side, chosenOption: mostRecent.chosenOption }
+                : null,
+            });
           }
         } catch {
-          // Non-critical — pick just won't persist
+          // Non-critical — picks just won't persist across a reload
         }
       } catch {
         useAuthStore.setState({

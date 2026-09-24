@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Achievement, AchievementContext, ActivePick, PickRecord, PickSide, Offering, RewardTier } from '../types';
 import { achievements, rewardTiers } from '../data/rewards';
 import { offlineDemoHistory, offlineDemoStats } from '../data/offlineSnapshot';
+import { etDayKey } from '../lib/timeFormat';
 
 const USE_FIREBASE = import.meta.env.VITE_USE_FIREBASE === 'true';
 
@@ -31,8 +32,21 @@ interface PendingSelection {
 interface GameState {
   activePick: ActivePick | null;
   pendingSelection: PendingSelection | null;
+  /**
+   * Most recent submission, for SubmitPickBar's post-submit confirmation.
+   * Display-only — NOT the gate. See submittedPicks for that.
+   */
   submittedPick: { offeringId: string; side: PickSide; chosenOption: string } | null;
-  submitted: boolean;
+  /**
+   * Every offering submitted today, keyed by offeringId.
+   *
+   * Streak runs on multiple pick windows a day, not one — a single global
+   * "submitted" flag (the previous shape here) meant finishing window 1
+   * locked the player out of window 2 until a page reload, since nothing
+   * ever reset it. Gating is per-offering instead: submitting one window
+   * does not block any other.
+   */
+  submittedPicks: Record<string, { side: PickSide; chosenOption: string }>;
   weeklyStreak: number;
   longestWeeklyStreak: number;
   weeklyWins: number;
@@ -84,7 +98,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activePick: null,
   pendingSelection: null,
   submittedPick: null,
-  submitted: false,
+  submittedPicks: {},
   weeklyStreak: SEED_STATS.weeklyStreak,
   longestWeeklyStreak: SEED_STATS.weeklyStreak,
   weeklyWins: SEED_STATS.weeklyWins,
@@ -106,7 +120,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   selectPick: (offering, side) => {
     const state = get();
-    if (state.submitted) return;
+    if (state.submittedPicks[offering.id]) return;
 
     if (
       state.pendingSelection?.offeringId === offering.id &&
@@ -124,7 +138,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   submitPick: () => {
     const state = get();
-    if (!state.pendingSelection || state.submitted) return;
+    if (!state.pendingSelection || state.submittedPicks[state.pendingSelection.offeringId]) return;
 
     const { offeringId, side, chosenOption, offering } = state.pendingSelection;
     const pendingRecord: PickRecord = {
@@ -147,8 +161,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         offering,
       },
       submittedPick: { offeringId, side, chosenOption },
+      submittedPicks: { ...state.submittedPicks, [offeringId]: { side, chosenOption } },
       pendingSelection: null,
-      submitted: true,
       pickHistory: [pendingRecord, ...state.pickHistory],
     });
 
@@ -157,15 +171,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       import('../firebase/collections').then(({ recordPick }) => {
         recordPick(state.uid!, offeringId, side, chosenOption, odds, offering);
       });
-      const today = new Date().toISOString().split('T')[0];
+      // Keyed by offeringId, not a fixed 'current' doc — multiple windows
+      // can be active the same day, and each needs its own row to survive
+      // a reload (see authStore's restore, which reads this whole subcollection).
+      const dayKey = etDayKey(new Date());
       import('firebase/firestore').then(({ doc, setDoc }) => {
         import('../firebase/config').then(({ db }) => {
-          setDoc(doc(db, 'users', state.uid!, 'activePick', 'current'), {
+          setDoc(doc(db, 'users', state.uid!, 'activePick', offeringId), {
             offeringId,
             side,
             chosenOption,
             startedAt: Date.now(),
-            date: today,
+            date: dayKey,
           });
         });
       });
@@ -327,7 +344,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       activePick: null,
       pendingSelection: null,
       submittedPick: null,
-      submitted: false,
+      submittedPicks: {},
       weeklyStreak: SEED_STATS.weeklyStreak,
       longestWeeklyStreak: SEED_STATS.weeklyStreak,
       weeklyWins: SEED_STATS.weeklyWins,

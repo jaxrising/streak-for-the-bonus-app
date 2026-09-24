@@ -61,3 +61,31 @@ export function formatDayLabelET(iso: string | Date): string {
   if (Number.isNaN(d.getTime())) return '';
   return ET_DAY_LABEL.format(d);
 }
+
+const ET_HOUR_24 = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour: 'numeric',
+  hour12: false,
+});
+
+/**
+ * The instant that is a given wall-clock hour, ET, on a given ET calendar day.
+ *
+ * Used to build "noon ET" / "11am ET" cutoffs for the pick-window scheduler.
+ * A fixed UTC offset would drift by an hour across the DST boundary the NFL
+ * season crosses in early November, so this corrects against what
+ * `America/New_York` actually reports for the guessed instant instead of
+ * assuming EDT or EST. Two passes is enough for an hour-level target — DST
+ * itself only ever flips at 2am, nowhere near noon.
+ */
+export function etDateAt(dayKey: string, hour: number): Date {
+  const [y, m, d] = dayKey.split('-').map(Number);
+  let guess = new Date(Date.UTC(y, m - 1, d, hour + 4, 0, 0)); // EDT guess
+  for (let i = 0; i < 2; i++) {
+    const reported = Number(ET_HOUR_24.format(guess)) % 24;
+    const diff = hour - reported;
+    if (diff === 0) break;
+    guess = new Date(guess.getTime() + diff * 3_600_000);
+  }
+  return guess;
+}

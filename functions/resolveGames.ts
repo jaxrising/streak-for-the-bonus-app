@@ -41,7 +41,7 @@ const WEB = 'https://site.web.api.espn.com/apis/common/v3/sports';
 /** Picks older than this are abandoned rather than retried forever. */
 const STALE_AFTER_HOURS = 72;
 
-type Kind = 'spread' | 'moneyline' | 'total' | 'milestone';
+type Kind = 'spread' | 'moneyline' | 'total' | 'milestone' | 'period';
 type Side = 'A' | 'B';
 
 interface Resolution {
@@ -52,6 +52,8 @@ interface Resolution {
   athleteId?: string;
   statKey?: string;
   target?: number;
+  /** period: which linescore period indices decide it — see Offering.resolution in src/types. */
+  periods?: number[];
 }
 
 interface OfferingDoc {
@@ -87,6 +89,7 @@ interface Competitor {
   homeAway?: string;
   score?: string;
   winner?: boolean;
+  linescores?: { value: number; period: number }[];
 }
 interface ScoreEvent {
   id: string;
@@ -151,13 +154,33 @@ async function statInGame(
  * ledger must agree on what happened, and two implementations of a grading
  * rule is how they stop agreeing.
  */
+/** Sum of this side's linescore entries for exactly these periods, or null if any haven't posted yet. */
+function sumPeriods(c: Competitor | undefined, periods: number[]): number | null {
+  const values = periods.map((p) => c?.linescores?.find((ls) => ls.period === p)?.value);
+  if (values.some((v) => v == null)) return null;
+  return values.reduce((a, b) => a! + b!, 0)!;
+}
+
 async function settle(
   off: OfferingDoc,
   board: Map<string, ScoreEvent>
 ): Promise<Side | 'push' | null> {
   const r = off.resolution;
   const ev = board.get(r.eventId);
-  if (!isFinal(ev) || !ev) return null;
+  if (!ev) return null;
+
+  // Settles as soon as its own periods have posted, not on the whole game
+  // finishing — a 1st-half pick shouldn't wait until the final whistle.
+  if (off.kind === 'period') {
+    if (!r.periods?.length) return null;
+    const a = sumPeriods(sideOf(ev, 'away'), r.periods);
+    const h = sumPeriods(sideOf(ev, 'home'), r.periods);
+    if (a == null || h == null) return null;
+    if (a === h) return 'push';
+    return a > h ? 'A' : 'B';
+  }
+
+  if (!isFinal(ev)) return null;
 
   if (off.kind === 'moneyline' || off.kind === 'spread') {
     // A = away, B = home

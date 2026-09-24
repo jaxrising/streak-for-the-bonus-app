@@ -3,11 +3,15 @@ export type Sport = 'NFL' | 'NBA' | 'NHL' | 'MLB' | 'Soccer' | 'Golf' | 'WNBA' |
 /**
  * What kind of question a card is asking.
  *
- * 'spread' is the original scoreboard-derived card. The other three are new:
- * 'moneyline' and 'total' come from the core API's priced odds node,
- * 'milestone' from its propBets collection.
+ * 'spread' is the original scoreboard-derived card, no longer generated
+ * (see draftKingsApi.ts) but still handled defensively wherever grading
+ * happens. 'moneyline' and 'total' come from the core API's priced odds
+ * node, 'milestone' from its propBets collection. 'period' is a half or
+ * quarter question on a manually-designated primetime game — there is no
+ * priced line for it anywhere in the feed, so it carries no odds and grades
+ * off the same scoreboard's real per-period linescores instead.
  */
-export type OfferingKind = 'spread' | 'moneyline' | 'total' | 'milestone';
+export type OfferingKind = 'spread' | 'moneyline' | 'total' | 'milestone' | 'period';
 
 export interface Offering {
   id: string;
@@ -109,6 +113,14 @@ export interface Offering {
     athleteId?: string;
     statKey?: string;
     target?: number;
+    /**
+     * periods: which ESPN linescore period indices (1-based) decide this
+     * pick — [1,2] for 1st half, [3,4] for 2nd half, [3] for 3rd quarter
+     * alone. Graded by summing each side's linescore entries for exactly
+     * these periods, so it settles the moment they're all present in the
+     * scoreboard rather than waiting for the whole game to finish.
+     */
+    periods?: number[];
   };
 
   /**

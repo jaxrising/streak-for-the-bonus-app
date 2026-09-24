@@ -31,6 +31,7 @@
 import type { Offering, Sport } from '../types';
 import { formatLockET } from './timeFormat';
 import { getPeriodWeekBounds } from './weekUtils';
+import { primetimeSchedule } from '../data/primetimeSchedule';
 
 const CORE = 'https://sports.core.api.espn.com/v2/sports';
 const WEB = 'https://site.web.api.espn.com/apis/common/v3/sports';
@@ -705,6 +706,173 @@ async function buildMilestoneOfferings(
   });
 
   return built.filter((x): x is Offering => x !== null);
+}
+
+// ---------------------------------------------------------------------------
+// primetime period windows — 1st half / 2nd half on the manually-designated
+// game, per primetimeSchedule.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * Which linescore period indices make up each half, by sport shape.
+ *
+ * Football and basketball play four quarters, so a half is two of them.
+ * Soccer plays two halves directly — its scoreboard reports exactly two
+ * linescore entries, one per half, not four. Baseball and hockey are left
+ * out: innings and periods don't map to a "half" cleanly enough to guess at.
+ */
+const HALF_PERIODS: Record<string, { firstHalf: number[]; secondHalf: number[] }> = {
+  'football/nfl': { firstHalf: [1, 2], secondHalf: [3, 4] },
+  'football/college-football': { firstHalf: [1, 2], secondHalf: [3, 4] },
+  'basketball/nba': { firstHalf: [1, 2], secondHalf: [3, 4] },
+  'basketball/wnba': { firstHalf: [1, 2], secondHalf: [3, 4] },
+  'soccer/eng.1': { firstHalf: [1], secondHalf: [2] },
+  'soccer/uefa.champions': { firstHalf: [1], secondHalf: [2] },
+  'soccer/usa.1': { firstHalf: [1], secondHalf: [2] },
+  'soccer/esp.1': { firstHalf: [1], secondHalf: [2] },
+  'soccer/ger.1': { firstHalf: [1], secondHalf: [2] },
+};
+
+/**
+ * Minutes from kickoff to (an estimate of) halftime, by sport.
+ *
+ * There is no feed for "halftime started" ahead of time, so the 2nd-half
+ * window's lock time is kickoff plus a fixed estimate rather than a real
+ * signal. It will run a few minutes early or late on a game that plays
+ * faster or slower than average — the fallback if that estimate turns out
+ * to be off in practice is a live-scoreboard check closer to kickoff, not
+ * built here.
+ */
+const HALFTIME_OFFSET_MIN: Record<string, number> = {
+  'football/nfl': 100,
+  'football/college-football': 105,
+  'basketball/nba': 75,
+  'basketball/wnba': 70,
+  'soccer/eng.1': 55,
+  'soccer/uefa.champions': 55,
+  'soccer/usa.1': 55,
+  'soccer/esp.1': 55,
+  'soccer/ger.1': 55,
+};
+
+interface SummaryCompetitor {
+  homeAway?: string;
+  score?: string;
+  winner?: boolean;
+  linescores?: { value: number; period: number }[];
+  team: {
+    displayName: string;
+    name?: string;
+    abbreviation: string;
+    color?: string;
+    logos?: { href: string; rel: string[] }[];
+  };
+}
+
+interface EventSummary {
+  header?: {
+    competitions?: {
+      id: string;
+      date: string;
+      competitors?: SummaryCompetitor[];
+    }[];
+  };
+}
+
+function summaryTeamLogo(c: SummaryCompetitor): string | undefined {
+  const logo = c.team.logos?.find((l) => l.rel.includes('default')) ?? c.team.logos?.[0];
+  return darkLogo(logo?.href);
+}
+
+/** Sum of this side's linescore entries for exactly these periods, or null if any haven't posted yet. */
+function sumPeriods(c: SummaryCompetitor, periods: number[]): number | null {
+  const values = periods.map((p) => c.linescores?.find((ls) => ls.period === p)?.value);
+  if (values.some((v) => v == null)) return null;
+  return values.reduce((a, b) => a! + b!, 0)!;
+}
+
+/**
+ * The two primetime period windows for one ET day, or [] if that day has no
+ * primetimeSchedule entry (or the league isn't one HALF_PERIODS covers).
+ *
+ * No oddsA/oddsB on these — same reasoning as milestones: the feed has no
+ * price for a half or a quarter, and inventing one would misrepresent what
+ * a real book would show. correctSide is filled in here so an already-final
+ * (or already-past-that-half) game still shows the winner on an unplayed
+ * card, exactly like moneyline/total do.
+ */
+export async function fetchPrimetimeOfferings(dayKey: string): Promise<Offering[]> {
+  const game = primetimeSchedule[dayKey];
+  if (!game) return [];
+
+  const halves = HALF_PERIODS[game.espnPath];
+  if (!halves) return [];
+
+  const data = await getJSON<EventSummary>(`${SITE}/${game.espnPath}/summary?event=${game.eventId}`);
+  const comp = data?.header?.competitions?.[0];
+  const away = comp?.competitors?.find((c) => c.homeAway === 'away');
+  const home = comp?.competitors?.find((c) => c.homeAway === 'home');
+  if (!comp || !away || !home) return [];
+
+  const kickoff = new Date(comp.date);
+  const offsetMin = HALFTIME_OFFSET_MIN[game.espnPath] ?? 90;
+  const halftimeEstimate = new Date(kickoff.getTime() + offsetMin * 60_000);
+
+  const sport: Sport = game.espnPath.startsWith('football')
+    ? 'NFL'
+    : game.espnPath.startsWith('basketball/wnba')
+    ? 'WNBA'
+    : game.espnPath.startsWith('basketball')
+    ? 'NBA'
+    : 'Soccer';
+
+  const build = (
+    idSuffix: string,
+    label: string,
+    periods: number[],
+    lockAt: Date
+  ): Offering => {
+    const awaySum = sumPeriods(away, periods);
+    const homeSum = sumPeriods(home, periods);
+    const correctSide =
+      awaySum != null && homeSum != null && awaySum !== homeSum
+        ? awaySum > homeSum
+          ? 'A'
+          : 'B'
+        : undefined;
+
+    return {
+      id: `period-${game.eventId}-${idSuffix}`,
+      sport,
+      league: sport,
+      kind: 'period',
+      question: `${label}: ${away.team.name ?? away.team.displayName} or ${home.team.name ?? home.team.displayName}?`,
+      optionA: away.team.displayName,
+      optionB: home.team.displayName,
+      shortA: away.team.name ?? away.team.displayName,
+      shortB: home.team.name ?? home.team.displayName,
+      abbrA: away.team.abbreviation,
+      abbrB: home.team.abbreviation,
+      imageA: summaryTeamLogo(away),
+      imageB: summaryTeamLogo(home),
+      colorA: away.team.color ? `#${away.team.color}` : '#333333',
+      colorB: home.team.color ? `#${home.team.color}` : '#333333',
+      startTime: formatLockET(lockAt),
+      startTimeISO: lockAt.toISOString(),
+      resolution: {
+        espnPath: game.espnPath,
+        eventId: game.eventId,
+        competitionId: comp.id,
+        periods,
+      },
+      correctSide,
+    };
+  };
+
+  return [
+    build('h1', 'Leading at halftime', halves.firstHalf, kickoff),
+    build('h2', '2nd-half winner', halves.secondHalf, halftimeEstimate),
+  ];
 }
 
 // ---------------------------------------------------------------------------
