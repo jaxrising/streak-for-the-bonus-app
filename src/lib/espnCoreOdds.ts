@@ -29,7 +29,7 @@
  */
 
 import type { Offering, Sport } from '../types';
-import { formatLockET } from './timeFormat';
+import { formatLockET, etDayKey } from './timeFormat';
 import { getPeriodWeekBounds } from './weekUtils';
 import { primetimeSchedule } from '../data/primetimeSchedule';
 
@@ -896,11 +896,35 @@ export interface CoreOddsOptions {
  * column — each drops out quietly and the rest still ship. A slate that is
  * partly there beats an error state.
  */
+/**
+ * Up to `cap` events per league PER ET DAY, not `cap` events per league for
+ * the whole 8-day horizon.
+ *
+ * `upcomingEvents` returns every league's games across the full horizon,
+ * oldest first. A flat `.slice(0, cap)` on that spends the whole budget on
+ * whichever days happen to sort first — MLB alone plays a dozen-plus games a
+ * day, so its first 4 games (the old cap) were all on day one, and every
+ * later day in the window got zero MLB game lines. Capping per day instead
+ * means every day gets its own shot at the same league.
+ */
+function capPerDay(events: SiteEvent[], cap: number): SiteEvent[] {
+  const perDay = new Map<string, number>();
+  const out: SiteEvent[] = [];
+  for (const ev of events) {
+    const day = etDayKey(ev.competitions[0].startDate);
+    const count = perDay.get(day) ?? 0;
+    if (count >= cap) continue;
+    perDay.set(day, count + 1);
+    out.push(ev);
+  }
+  return out;
+}
+
 export async function fetchCoreOfferings(opts: CoreOddsOptions = {}): Promise<Offering[]> {
   const { gamesPerLeague = 4, propGamesPerLeague = 2, milestonesPerGame = 3 } = opts;
 
   const lineWork = LINE_LEAGUES.map(async (lg) => {
-    const events = (await upcomingEvents(lg)).slice(0, gamesPerLeague);
+    const events = capPerDay(await upcomingEvents(lg), gamesPerLeague);
     const perEvent = await mapLimit(events, 4, async (ev) => {
       const node = await getJSON<{ items?: (OddsNode & { provider?: { id?: string } })[] }>(
         `${corePath(lg.path)}/events/${ev.id}/competitions/${ev.competitions[0].id}/odds`

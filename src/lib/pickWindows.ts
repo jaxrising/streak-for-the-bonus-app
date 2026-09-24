@@ -62,12 +62,35 @@ export function buildDailyWindows(
 
   const primetimeEventId = primetimeSchedule[dayKey]?.eventId;
 
+  /*
+   * The primetime game's own matchup gets a GUARANTEED slot, same as its
+   * two period windows — not just another candidate in the "fill to 4"
+   * race below.
+   *
+   * It used to be excluded outright once its period windows were in, which
+   * read as removing the biggest game of the day rather than featuring it
+   * (real feedback from testing this). Making it merely eligible instead of
+   * excluded isn't enough either: the fill loop below picks earliest-locking
+   * candidates first, and a primetime game (evening, by definition) loses
+   * that race to any afternoon game on the same day. Guaranteeing its slot
+   * up front is what actually keeps it on the board.
+   */
+  if (primetimeEventId) {
+    // Moneyline first, total as a fallback — never a milestone prop off the
+    // same game. A prop is still about one player, not "the game"; picking
+    // whichever of the game's offerings happened to sort first surfaced a
+    // player prop here at least once, which isn't the matchup either.
+    const matchup =
+      candidates.find((o) => o.resolution?.eventId === primetimeEventId && o.kind === 'moneyline') ??
+      candidates.find((o) => o.resolution?.eventId === primetimeEventId && o.kind === 'total');
+    if (matchup) add(matchup);
+  }
+
   for (const o of candidates) {
     if (windows.length >= MIN_WINDOWS_PER_DAY) break;
     if (usedIds.has(o.id)) continue;
-    // The primetime game's own full-game markets are left out once its two
-    // period windows are in — a window is meant to add variety, not stack
-    // three picks onto the one game that already has two.
+    // Its one slot is guaranteed above; skip any other market on the same
+    // game so the fill doesn't stack a second or third pick onto it.
     if (primetimeEventId && o.resolution?.eventId === primetimeEventId) continue;
     add(o);
   }
